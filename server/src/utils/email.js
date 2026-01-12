@@ -347,25 +347,27 @@ export const getTemplate = (templateKey, variables = {}) => {
 /**
  * Send email using nodemailer
  * @param {string} to - Recipient email address
- * @param {string} subject - Email subject
- * @param {string} html - HTML content of the email
- * @param {string} text - Plain text content of the email (optional)
+ * @param {string} templateId - Template ID/key from emailTemplates object
+ * @param {Object} options - Object containing key-value pairs to replace in template variables
  * @returns {Promise<Object>} Email send result with sent status and messageId
  */
-export const sendMail = async (to, subject, html, text = '') => {
+export const sendMail = async (to, templateId, options = {}) => {
   if (!SMTP_USER || !SMTP_PASS) {
     console.warn('Email configuration not set. Skipping email send.');
     console.log('Email would be sent to:', to);
-    console.log('Subject:', subject);
+    console.log('Template ID:', templateId);
     return { sent: false, message: 'Email not configured' };
   }
 
+  // Get template using templateId and replace variables using options
+  const template = getTemplate(templateId, options);
+
   const mailOptions = {
-    from: `"{{app_name}}" <${EMAIL_FROM}>`,
+    from: `"${APP_NAME}" <${EMAIL_FROM}>`,
     to: to,
-    subject: subject,
-    html: html,
-    text: text || html.replace(/<[^>]*>/g, '') // Convert HTML to text if text not provided
+    subject: template.subject,
+    html: template.html,
+    text: template.text
   };
 
   try {
@@ -407,7 +409,7 @@ export const sendWelcomeEmail = async (
     day: 'numeric'
   });
 
-  const template = getTemplate('welcome', {
+  return await sendMail(userEmail, 'welcome', {
     inviter_name: inviterName,
     inviter_role: inviterRole,
     company_name: COMPANY_NAME,
@@ -422,30 +424,4 @@ export const sendWelcomeEmail = async (
     privacy_url: PRIVACY_URL,
     contact_url: CONTACT_URL
   });
-
-  return await sendMail(userEmail, template.subject, template.html, template.text);
-};
-
-/**
- * Generate a random temporary password
- * @returns {string} Random password
- */
-export const generateTempPassword = () => {
-  const length = 12;
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
-  
-  // Ensure at least one of each type
-  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // uppercase
-  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // lowercase
-  password += '0123456789'[Math.floor(Math.random() * 10)]; // number
-  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // special char
-  
-  // Fill the rest
-  for (let i = password.length; i < length; i++) {
-    password += charset[Math.floor(Math.random() * charset.length)];
-  }
-  
-  // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
 };

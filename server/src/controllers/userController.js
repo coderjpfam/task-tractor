@@ -133,19 +133,55 @@ export const createUser = async (req, res, next) => {
     
     // Send welcome/invitation email
     try {
-      const { sendWelcomeEmail } = await import('../utils/email.js');
+      const { sendMail } = await import('../utils/email.js');
+      const jwt = await import('jsonwebtoken');
+      const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
       const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
-      const invitationUrl = `${CLIENT_URL}/register?email=${encodeURIComponent(user.email)}`;
+      const COMPANY_NAME = process.env.COMPANY_NAME || 'Task Manager';
+      const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || '';
+      const HELP_URL = process.env.HELP_URL || '#';
+      const PRIVACY_URL = process.env.PRIVACY_URL || '#';
+      const CONTACT_URL = process.env.CONTACT_URL || '#';
       
-      await sendWelcomeEmail(
-        user.email,
-        creator.fullName,
-        creator.role,
-        user.role,
-        department.name,
-        '', // personal message - can be empty or added as parameter later
-        invitationUrl
+      // Generate JWT invitation token (valid for 7 days)
+      const invitationToken = jwt.default.sign(
+        {
+          userId: user.userId,
+          email: user.email,
+          type: 'invitation'
+        },
+        JWT_SECRET,
+        { expiresIn: '7d' }
       );
+      
+      const invitationUrl = `${CLIENT_URL}/register?token=${invitationToken}`;
+      
+      // Calculate expiry date (7 days from now)
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 7);
+      const formattedExpiryDate = expiryDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      // Send email using new flow with templateId and options
+      const mailOptions = {
+        inviter_name: creator.fullName,
+        inviter_role: creator.role,
+        company_name: COMPANY_NAME,
+        user_email: user.email,
+        assigned_role: user.role,
+        department_name: department.name,
+        personal_message: '',
+        expiry_date: formattedExpiryDate,
+        invitation_url: invitationUrl,
+        support_email: SUPPORT_EMAIL,
+        help_url: HELP_URL,
+        privacy_url: PRIVACY_URL,
+        contact_url: CONTACT_URL
+      };
+      await sendMail(user.email, 'welcome', mailOptions);
     } catch (emailError) {
       console.error('Error sending welcome email:', emailError);
       // Don't fail user creation if email fails, just log the error

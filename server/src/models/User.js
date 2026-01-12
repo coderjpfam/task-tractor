@@ -5,7 +5,6 @@ import { generateNextId } from '../utils/idGenerator.js';
 const userSchema = new mongoose.Schema({
   userId: {
     type: String,
-    required: true,
     unique: true,
     trim: true
   },
@@ -30,7 +29,6 @@ const userSchema = new mongoose.Schema({
   },
   hashedPassword: {
     type: String,
-    required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters']
   },
   departmentId: {
@@ -47,7 +45,6 @@ const userSchema = new mongoose.Schema({
   },
   createdBy: {
     type: String,
-    required: [true, 'Created by is required'],
     trim: true
   },
   isDeleted: {
@@ -82,7 +79,7 @@ userSchema.pre('save', async function(next) {
   try {
     // Find the last user to get the previous ID
     const lastUser = await mongoose.model('User')
-      .findOne({ isDeleted: false })
+      .findOne()
       .sort({ userId: -1 })
       .select('userId')
       .lean();

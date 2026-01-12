@@ -4,7 +4,6 @@ import { generateNextId } from '../utils/idGenerator.js';
 const departmentSchema = new mongoose.Schema({
   departmentId: {
     type: String,
-    required: true,
     unique: true,
     trim: true
   },
@@ -21,7 +20,6 @@ const departmentSchema = new mongoose.Schema({
   },
   createdBy: {
     type: String,
-    required: [true, 'Created by is required'],
     trim: true
   },
   isDeleted: {
@@ -41,7 +39,7 @@ departmentSchema.pre('save', async function(next) {
   try {
     // Find the last department to get the previous ID
     const lastDepartment = await mongoose.model('Department')
-      .findOne({ isDeleted: false })
+      .findOne()
       .sort({ departmentId: -1 })
       .select('departmentId')
       .lean();
