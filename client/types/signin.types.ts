@@ -23,7 +23,9 @@ export interface SignInFormErrors {
 /**
  * Email input component props
  */
-export interface EmailInputProps extends InputFieldProps {}
+export interface EmailInputProps extends InputFieldProps {
+  disabled?: boolean;
+}
 
 /**
  * Password input component props

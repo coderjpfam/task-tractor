@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { verifyRegisterTokenThunk } from '@/store/auth/authThunks';
 import { useTheme } from '@/components/signin/useTheme';
 import { validateEmail } from '@/components/signin/validation';
 import EmailInput from '@/components/signin/EmailInput';
@@ -20,6 +22,9 @@ interface RegisterFormProps {
 
 export default function RegisterForm({ token }: RegisterFormProps) {
   const { isDark } = useTheme();
+  const dispatch = useAppDispatch();
+  const { verifyRegisterToken } = useAppSelector((state) => state.auth);
+  
   const [formData, setFormData] = useState<RegisterFormData>({
     profilePic: null,
     name: '',
@@ -31,6 +36,38 @@ export default function RegisterForm({ token }: RegisterFormProps) {
   const [errors, setErrors] = useState<RegisterFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [tokenValidated, setTokenValidated] = useState(false);
+
+  // Validate token and prefill form when token is available
+  useEffect(() => {
+    if (token && !tokenValidated) {
+      const validateToken = async () => {
+        try {
+          const result = await dispatch(verifyRegisterTokenThunk({ token })).unwrap();
+          
+          if (result.success && result.data) {
+            // Prefill form with data from token validation
+            // Use departmentName for display, fallback to departmentId if name not available
+            setFormData(prev => ({
+              ...prev,
+              name: result.data.fullName || '',
+              email: result.data.email || '',
+              department: result.data.departmentName || result.data.departmentId || ''
+            }));
+            setTokenValidated(true);
+          }
+        } catch (error) {
+          // Token validation failed - error is already in Redux state
+          console.error('Token validation failed:', error);
+        }
+      };
+
+      validateToken();
+    } else if (!token) {
+      // No token provided, mark as validated to show form
+      setTokenValidated(true);
+    }
+  }, [token, tokenValidated, dispatch]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -111,6 +148,56 @@ export default function RegisterForm({ token }: RegisterFormProps) {
     }
   };
 
+  // Show loading state while validating token
+  if (token && !tokenValidated && verifyRegisterToken.loading) {
+    return (
+      <div className={`w-full max-w-md rounded-lg p-8 transition-colors duration-200 ${
+        isDark 
+          ? 'bg-slate-900 border border-slate-800' 
+          : 'bg-white border border-neutral-200'
+      }`}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+            Validating invitation token...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if token validation failed
+  if (token && !tokenValidated && verifyRegisterToken.error) {
+    return (
+      <div className={`w-full max-w-md rounded-lg p-8 transition-colors duration-200 ${
+        isDark 
+          ? 'bg-slate-900 border border-slate-800' 
+          : 'bg-white border border-neutral-200'
+      }`}>
+        <RegisterHeader isDark={isDark} />
+        <div className={`mt-4 p-4 rounded border ${
+          isDark 
+            ? 'bg-red-500/10 border-red-500/50' 
+            : 'bg-red-50 border-red-200'
+        }`}>
+          <p className={`text-sm font-medium ${
+            isDark ? 'text-red-400' : 'text-red-600'
+          }`}>
+            {verifyRegisterToken.error}
+          </p>
+          <p className={`text-xs mt-2 ${
+            isDark ? 'text-slate-400' : 'text-slate-600'
+          }`}>
+            The invitation link may be invalid or expired. Please contact your administrator for a new invitation.
+          </p>
+        </div>
+        <div className="mt-6">
+          <SignInLink isDark={isDark} />
+        </div>
+      </div>
+    );
+  }
+
   if (isSuccess) {
     return (
       <div className={`w-full max-w-md rounded-lg p-8 transition-colors duration-200 ${
@@ -142,6 +229,11 @@ export default function RegisterForm({ token }: RegisterFormProps) {
     );
   }
 
+  // Don't show form until token is validated (if token exists)
+  if (token && !tokenValidated) {
+    return null;
+  }
+
   return (
     <div className={`w-full max-w-md rounded-lg p-8 transition-colors duration-200 ${
       isDark 
@@ -170,6 +262,7 @@ export default function RegisterForm({ token }: RegisterFormProps) {
           onChange={handleInputChange}
           error={errors.email}
           isDark={isDark}
+          disabled={!!token}
         />
 
         <DepartmentInput
@@ -177,6 +270,7 @@ export default function RegisterForm({ token }: RegisterFormProps) {
           onChange={handleInputChange}
           error={errors.department}
           isDark={isDark}
+          disabled={!!token}
         />
 
         <PasswordInput

@@ -2,7 +2,7 @@
 
 import type { EmailInputProps } from '@/types/signin.types';
 
-export default function EmailInput({ value, onChange, error, isDark }: EmailInputProps) {
+export default function EmailInput({ value, onChange, error, isDark, disabled }: EmailInputProps) {
   return (
     <div>
       <label htmlFor="email" className={`block text-sm font-medium mb-1.5 ${
@@ -16,14 +16,19 @@ export default function EmailInput({ value, onChange, error, isDark }: EmailInpu
         name="email"
         value={value}
         onChange={onChange}
+        disabled={disabled}
         className={`w-full px-3 py-2 rounded border transition-colors duration-200 ${
-          error 
+          disabled
             ? isDark
-              ? 'border-red-500 bg-slate-900 text-slate-100 focus:border-red-400 focus:ring-1 focus:ring-red-400'
-              : 'border-red-500 bg-white text-slate-900 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-            : isDark 
-              ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder-slate-500 focus:border-teal-500 focus:ring-1 focus:ring-teal-500' 
-              : 'bg-white border-neutral-300 text-slate-900 placeholder-slate-400 focus:border-teal-600 focus:ring-1 focus:ring-teal-600'
+              ? 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed'
+              : 'bg-neutral-100 border-neutral-300 text-slate-500 cursor-not-allowed'
+            : error 
+              ? isDark
+                ? 'border-red-500 bg-slate-900 text-slate-100 focus:border-red-400 focus:ring-1 focus:ring-red-400'
+                : 'border-red-500 bg-white text-slate-900 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+              : isDark 
+                ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder-slate-500 focus:border-teal-500 focus:ring-1 focus:ring-teal-500' 
+                : 'bg-white border-neutral-300 text-slate-900 placeholder-slate-400 focus:border-teal-600 focus:ring-1 focus:ring-teal-600'
         } focus:outline-none`}
         placeholder="name@company.com"
       />

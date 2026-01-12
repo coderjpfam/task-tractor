@@ -41,12 +41,16 @@ export interface RegisterButtonProps extends ButtonProps {}
 /**
  * Name input component props
  */
-export interface NameInputProps extends InputFieldProps {}
+export interface NameInputProps extends InputFieldProps {
+  disabled?: boolean;
+}
 
 /**
  * Department input component props
  */
-export interface DepartmentInputProps extends InputFieldProps {}
+export interface DepartmentInputProps extends InputFieldProps {
+  disabled?: boolean;
+}
 
 /**
  * Profile picture upload component props

@@ -121,6 +121,8 @@ export interface VerifyRegisterTokenData {
   userId: string;
   fullName: string;
   email: string;
+  departmentId: string;
+  departmentName: string | null;
 }
 
 /**

@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import Department from '../models/Department.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken, getTokenExpiration, JWT_ACCESS_EXPIRES_IN } from '../utils/jwt.js';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
@@ -425,13 +426,25 @@ export const verifyRegisterToken = async (req, res, next) => {
       });
     }
 
+    // Fetch department information
+    let departmentName = null;
+    if (user.departmentId) {
+      const department = await Department.findOne({
+        departmentId: user.departmentId,
+        isDeleted: false
+      }).select('name');
+      departmentName = department?.name || null;
+    }
+
     // Return user information
     res.status(200).json({
       success: true,
       data: {
         userId: user.userId,
         fullName: user.fullName,
-        email: user.email
+        email: user.email,
+        departmentId: user.departmentId,
+        departmentName: departmentName
       }
     });
   } catch (error) {
