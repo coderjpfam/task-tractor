@@ -81,6 +81,19 @@ export const createUser = async (req, res, next) => {
 
     const createdBy = req.user.userId;
 
+    // Get creator's full info (inviter)
+    const creator = await User.findOne({
+      userId: createdBy,
+      isDeleted: false
+    }).select('fullName role');
+
+    if (!creator) {
+      return res.status(404).json({
+        success: false,
+        error: 'Creator user not found'
+      });
+    }
+
     // Check if department exists
     const department = await Department.findOne({
       departmentId: departmentId,
@@ -107,26 +120,32 @@ export const createUser = async (req, res, next) => {
       });
     }
 
-    // Generate temporary password
-    const { generateTempPassword } = await import('../utils/email.js');
-    const tempPassword = generateTempPassword();
-
     // Create user data
     const userData = {
       email: email.toLowerCase(),
       fullName: fullName.trim(),
       departmentId: departmentId,
-      hashedPassword: tempPassword, // Will be hashed by pre-save hook
       createdBy: createdBy,
       role: 'employee' // Default role
     };
 
     const user = await User.create(userData);
     
-    // Send welcome email with temporary password
+    // Send welcome/invitation email
     try {
       const { sendWelcomeEmail } = await import('../utils/email.js');
-      await sendWelcomeEmail(user.email, user.fullName, tempPassword);
+      const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+      const invitationUrl = `${CLIENT_URL}/register?email=${encodeURIComponent(user.email)}`;
+      
+      await sendWelcomeEmail(
+        user.email,
+        creator.fullName,
+        creator.role,
+        user.role,
+        department.name,
+        '', // personal message - can be empty or added as parameter later
+        invitationUrl
+      );
     } catch (emailError) {
       console.error('Error sending welcome email:', emailError);
       // Don't fail user creation if email fails, just log the error
