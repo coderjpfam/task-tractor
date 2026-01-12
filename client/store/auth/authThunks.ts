@@ -13,6 +13,10 @@ import type {
   ResetPasswordRequest,
   ChangePasswordRequest,
   LogoutRequest,
+  RegisterInvitedUserRequest,
+  RegisterInvitedUserResponse,
+  VerifyRegisterTokenRequest,
+  VerifyRegisterTokenResponse,
 } from './authTypes';
 
 /**
@@ -117,6 +121,7 @@ export const refreshTokenThunk = createAsyncThunk<
     }
 
     return {
+      user: data.user,
       access_token: data.access_token,
       expires_in: data.expires_in,
     };
@@ -191,6 +196,70 @@ export const changePasswordThunk = createAsyncThunk<
   } catch (error) {
     return rejectWithValue(
       error instanceof Error ? error.message : 'Password change failed'
+    );
+  }
+});
+
+/**
+ * Verify register token thunk
+ */
+export const verifyRegisterTokenThunk = createAsyncThunk<
+  VerifyRegisterTokenResponse,
+  VerifyRegisterTokenRequest,
+  { rejectValue: string }
+>('auth/verifyRegisterToken', async (payload, { rejectWithValue }) => {
+  try {
+    const response = await axiosInstance.get<VerifyRegisterTokenResponse>(
+      '/auth/verify-register-token',
+      {
+        params: {
+          token: payload.token,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof Error ? error.message : 'Token verification failed'
+    );
+  }
+});
+
+/**
+ * Register invited user thunk
+ */
+export const registerInvitedUserThunk = createAsyncThunk<
+  RegisterInvitedUserResponse,
+  RegisterInvitedUserRequest,
+  { rejectValue: string }
+>('auth/registerInvitedUser', async (payload, { rejectWithValue }) => {
+  try {
+    // Create FormData for multipart/form-data request
+    const formData = new FormData();
+    formData.append('token', payload.token);
+    formData.append('fullName', payload.fullName);
+    formData.append('password', payload.password);
+    formData.append('password_confirmation', payload.password_confirmation);
+    
+    // Append profile picture if provided
+    if (payload.profilePic) {
+      formData.append('profilePic', payload.profilePic);
+    }
+
+    const response = await axiosInstance.post<RegisterInvitedUserResponse>(
+      '/auth/register-invited',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof Error ? error.message : 'Registration failed'
     );
   }
 });

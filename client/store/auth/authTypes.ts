@@ -13,6 +13,9 @@ export interface User {
   departmentId?: string;
   role: 'admin' | 'manager' | 'team_lead' | 'employee';
   createdAt?: string;
+  joinedAt?: string | Date;
+  invitedOn?: string | Date;
+  status?: 'invited' | 'joined' | 'deleted';
 }
 
 /**
@@ -45,6 +48,7 @@ export interface RefreshTokenRequest {
  * Refresh token response
  */
 export interface RefreshTokenResponse {
+  user: User;
   access_token: string;
   expires_in: number;
 }
@@ -84,6 +88,50 @@ export interface LogoutRequest {
 }
 
 /**
+ * Register invited user request payload
+ */
+export interface RegisterInvitedUserRequest {
+  token: string;
+  fullName: string;
+  password: string;
+  password_confirmation: string;
+  profilePic?: File;
+}
+
+/**
+ * Register invited user response
+ */
+export interface RegisterInvitedUserResponse {
+  success: boolean;
+  message: string;
+  user: User;
+}
+
+/**
+ * Verify register token request payload
+ */
+export interface VerifyRegisterTokenRequest {
+  token: string;
+}
+
+/**
+ * Verify register token response data
+ */
+export interface VerifyRegisterTokenData {
+  userId: string;
+  fullName: string;
+  email: string;
+}
+
+/**
+ * Verify register token response
+ */
+export interface VerifyRegisterTokenResponse {
+  success: boolean;
+  data: VerifyRegisterTokenData;
+}
+
+/**
  * Async operation state
  */
 export interface AsyncState {
@@ -106,6 +154,8 @@ export interface AuthState {
   forgotPassword: AsyncState;
   resetPassword: AsyncState;
   changePassword: AsyncState;
+  registerInvitedUser: AsyncState;
+  verifyRegisterToken: AsyncState;
   
   // General auth state
   isAuthenticated: boolean;

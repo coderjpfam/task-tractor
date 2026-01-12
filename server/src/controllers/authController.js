@@ -1,6 +1,14 @@
 import User from '../models/User.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken, getTokenExpiration, JWT_ACCESS_EXPIRES_IN } from '../utils/jwt.js';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import fs from 'fs/promises';
+import path from 'path';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // @desc    User Login
 // @route   POST /auth/login
@@ -63,7 +71,10 @@ export const login = async (req, res, next) => {
       profilePath: user.profilePath,
       departmentId: user.departmentId,
       role: user.role,
-      createdAt: user.createdAt
+      createdAt: user.createdAt,
+      joinedAt: user.joinedAt,
+      invitedOn: user.invitedOn,
+      status: user.status
     };
 
     res.status(200).json({
@@ -198,8 +209,23 @@ export const refreshToken = async (req, res, next) => {
     // Generate new access token
     const accessToken = generateAccessToken(user.userId, user.email, user.role);
 
+    // Prepare user data (exclude password)
+    const userData = {
+      userId: user.userId,
+      fullName: user.fullName,
+      email: user.email,
+      profilePath: user.profilePath,
+      departmentId: user.departmentId,
+      role: user.role,
+      createdAt: user.createdAt,
+      joinedAt: user.joinedAt,
+      invitedOn: user.invitedOn,
+      status: user.status
+    };
+
     res.status(200).json({
       success: true,
+      user: userData,
       access_token: accessToken,
       expires_in: getTokenExpiration(JWT_ACCESS_EXPIRES_IN)
     });
@@ -328,3 +354,293 @@ export const resetPassword = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Verify Register Token
+// @route   GET /auth/verify-register-token
+// @access  Public
+// Query: { token }
+export const verifyRegisterToken = async (req, res, next) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token is required'
+      });
+    }
+
+    // Verify invitation token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+      
+      // Check if token is an invitation token
+      if (decoded.type !== 'invitation') {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid invitation token'
+        });
+      }
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired invitation token'
+      });
+    }
+
+    // Extract email and userId from token
+    const email = decoded.email;
+    const userId = decoded.userId;
+
+    if (!email || !userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid invitation token format'
+      });
+    }
+
+    // Find user by email or userId
+    const user = await User.findOne({
+      $or: [
+        { email: email.toLowerCase() },
+        { userId: userId }
+      ],
+      isDeleted: false,
+      status: { $ne: 'deleted' }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found for this invitation'
+      });
+    }
+
+    // Check if user already has a password (already registered)
+    if (user.hashedPassword || user.status !== 'invited') {
+      return res.status(400).json({
+        success: false,
+        error: 'User has already completed registration'
+      });
+    }
+
+    // Return user information
+    res.status(200).json({
+      success: true,
+      data: {
+        userId: user.userId,
+        fullName: user.fullName,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Register Invited User
+// @route   POST /auth/register-invited
+// @access  Public
+// Body: { token, fullName, password, password_confirmation } + profile pic (multipart/form-data)
+export const registerInvitedUser = async (req, res, next) => {
+  try {
+    const { token, fullName, password, password_confirmation } = req.body;
+
+    // Validation
+    if (!token || !fullName || !password || !password_confirmation) {
+      // Delete uploaded file if validation fails
+      if (req.file) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
+        }
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Token, full name, password, and password confirmation are required'
+      });
+    }
+
+    if (password !== password_confirmation) {
+      // Delete uploaded file if validation fails
+      if (req.file) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
+        }
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Password and confirmation do not match'
+      });
+    }
+
+    if (password.length < 6) {
+      // Delete uploaded file if validation fails
+      if (req.file) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
+        }
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 6 characters'
+      });
+    }
+
+    // Verify invitation token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+      
+      // Check if token is an invitation token
+      if (decoded.type !== 'invitation') {
+        // Delete uploaded file if validation fails
+        if (req.file) {
+          try {
+            await fs.unlink(req.file.path);
+          } catch (unlinkError) {
+            console.error('Error deleting file:', unlinkError);
+          }
+        }
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid invitation token'
+        });
+      }
+    } catch (error) {
+      // Delete uploaded file if validation fails
+      if (req.file) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
+        }
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired invitation token'
+      });
+    }
+
+    // Extract email from token
+    const email = decoded.email;
+    const userId = decoded.userId;
+
+    if (!email || !userId) {
+      // Delete uploaded file if validation fails
+      if (req.file) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
+        }
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid invitation token format'
+      });
+    }
+
+    // Find user by email or userId
+    const user = await User.findOne({
+      $or: [
+        { email: email.toLowerCase() },
+        { userId: userId }
+      ],
+      isDeleted: false,
+      status: { $ne: 'deleted' }
+    });
+
+    if (!user) {
+      // Delete uploaded file if user not found
+      if (req.file) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
+        }
+      }
+      return res.status(404).json({
+        success: false,
+        error: 'User not found for this invitation'
+      });
+    }
+
+    // Check if user already has a password (already registered) or status is not 'invited'
+    if (user.hashedPassword || user.status !== 'invited') {
+      // Delete uploaded file if user already registered
+      if (req.file) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
+        }
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'User has already completed registration'
+      });
+    }
+
+    // Handle profile image upload
+    let profilePath = user.profilePath;
+    if (req.file) {
+      // Delete old profile image if it exists
+      if (user.profilePath) {
+        try {
+          await fs.unlink(user.profilePath);
+        } catch (unlinkError) {
+          console.error('Error deleting old file:', unlinkError);
+        }
+      }
+      profilePath = req.file.path;
+    }
+
+    // Update user with registration details
+    user.fullName = fullName.trim();
+    user.hashedPassword = password; // Will be hashed by pre-save hook
+    user.profilePath = profilePath;
+    user.joinedAt = new Date();
+    user.status = 'joined';
+    user.lastUpdatedAt = new Date();
+    
+    await user.save();
+
+    // Prepare user data (exclude password)
+    const userData = {
+      userId: user.userId,
+      fullName: user.fullName,
+      email: user.email,
+      profilePath: user.profilePath,
+      departmentId: user.departmentId,
+      role: user.role,
+      createdAt: user.createdAt,
+      joinedAt: user.joinedAt,
+      invitedOn: user.invitedOn,
+      status: user.status
+    };
+
+    res.status(200).json({
+      success: true,
+      message: 'Registration completed successfully',
+      user: userData
+    });
+  } catch (error) {
+    // Delete uploaded file if error occurs
+    if (req.file && req.file.path) {
+      try {
+        await fs.unlink(req.file.path);
+      } catch (unlinkError) {
+        console.error('Error deleting file:', unlinkError);
+      }
+    }
+    next(error);
+  }
+};
+

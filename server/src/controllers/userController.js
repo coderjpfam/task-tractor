@@ -126,7 +126,9 @@ export const createUser = async (req, res, next) => {
       fullName: fullName.trim(),
       departmentId: departmentId,
       createdBy: createdBy,
-      role: 'employee' // Default role
+      role: 'employee', // Default role
+      invitedOn: new Date(),
+      status: 'invited'
     };
 
     const user = await User.create(userData);
@@ -320,7 +322,7 @@ export const deleteUser = async (req, res, next) => {
 
     await User.findOneAndUpdate(
       { userId: req.params.id, isDeleted: false },
-      { isDeleted: true, lastUpdatedAt: new Date() }
+      { isDeleted: true, status: 'deleted', lastUpdatedAt: new Date() }
     );
 
     res.status(200).json({

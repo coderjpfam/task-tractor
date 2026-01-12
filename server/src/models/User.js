@@ -65,6 +65,19 @@ const userSchema = new mongoose.Schema({
   passwordResetExpires: {
     type: Date,
     default: null
+  },
+  joinedAt: {
+    type: Date,
+    default: null
+  },
+  invitedOn: {
+    type: Date,
+    default: null
+  },
+  status: {
+    type: String,
+    enum: ['invited', 'joined', 'deleted'],
+    default: 'invited'
   }
 }, {
   timestamps: true
@@ -119,6 +132,7 @@ userSchema.index({ email: 1 });
 userSchema.index({ isDeleted: 1 });
 userSchema.index({ departmentId: 1 });
 userSchema.index({ role: 1 });
+userSchema.index({ status: 1 });
 
 const User = mongoose.model('User', userSchema);
 
