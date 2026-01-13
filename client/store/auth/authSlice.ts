@@ -16,11 +16,21 @@ import {
   verifyTokenThunk,
 } from './authThunks';
 
+// Helper function to safely get token from localStorage (SSR-safe)
+const getTokenFromStorage = (key: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
 // Initial state
 const initialState: AuthState = {
   user: null,
-  accessToken: typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null,
-  refreshToken: typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null,
+  accessToken: getTokenFromStorage('accessToken'),
+  refreshToken: getTokenFromStorage('refreshToken'),
   
   // Individual loading and error states for each thunk
   login: {

@@ -3,8 +3,6 @@
  */
 
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosError } from 'axios';
-import { store } from '@/store';
-import { refreshTokenThunk } from '@/store/auth/authThunks';
 
 // API base URL - should be configured via environment variable
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -70,18 +68,19 @@ axiosInstance.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // Handle common error cases
-    if (error.response) {
-      // Server responded with error status
-      const { status, data } = error.response;
-      
-      // Handle 401 Unauthorized - Try to refresh token
-      // Skip refresh logic for auth endpoints that shouldn't trigger refresh (to prevent infinite loops)
-      const isAuthEndpoint = originalRequest?.url?.includes('/auth/refresh') || 
-                              originalRequest?.url?.includes('/auth/verify-token') ||
-                              originalRequest?.url?.includes('/auth/login');
-      
-      if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
+      // Handle common error cases
+      if (error.response) {
+        // Server responded with error status
+        const { status, data } = error.response;
+        const errorData = data as { error?: string; message?: string } | undefined;
+        
+        // Handle 401 Unauthorized - Try to refresh token
+        // Skip refresh logic for auth endpoints that shouldn't trigger refresh (to prevent infinite loops)
+        const isAuthEndpoint = originalRequest?.url?.includes('/auth/refresh') || 
+                                originalRequest?.url?.includes('/auth/verify-token') ||
+                                originalRequest?.url?.includes('/auth/login');
+        
+        if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
         if (isRefreshing) {
           // If already refreshing, queue this request
           return new Promise((resolve, reject) => {
@@ -117,11 +116,15 @@ axiosInstance.interceptors.response.use(
               window.location.href = '/signin';
             }
             
-            const errorMessage = data?.error || data?.message || 'Authentication required';
+            const errorMessage = errorData?.error || errorData?.message || 'Authentication required';
             return Promise.reject(new Error(errorMessage));
           }
 
           try {
+            // Lazy import to avoid circular dependency
+            const { store } = await import('@/store');
+            const { refreshTokenThunk } = await import('@/store/auth/authThunks');
+            
             // Attempt to refresh the token
             const result = await store.dispatch(refreshTokenThunk());
             
@@ -171,7 +174,7 @@ axiosInstance.interceptors.response.use(
       }
       
       // Extract error message from response
-      const errorMessage = data?.error || data?.message || 'An error occurred';
+      const errorMessage = errorData?.error || errorData?.message || 'An error occurred';
       return Promise.reject(new Error(errorMessage));
     } else if (error.request) {
       // Request was made but no response received
