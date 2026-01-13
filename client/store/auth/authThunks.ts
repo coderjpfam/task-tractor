@@ -17,6 +17,8 @@ import type {
   RegisterInvitedUserResponse,
   VerifyRegisterTokenRequest,
   VerifyRegisterTokenResponse,
+  VerifyTokenRequest,
+  VerifyTokenResponse,
 } from './authTypes';
 
 /**
@@ -260,6 +262,33 @@ export const registerInvitedUserThunk = createAsyncThunk<
   } catch (error) {
     return rejectWithValue(
       error instanceof Error ? error.message : 'Registration failed'
+    );
+  }
+});
+
+/**
+ * Verify token thunk
+ */
+export const verifyTokenThunk = createAsyncThunk<
+  VerifyTokenResponse,
+  VerifyTokenRequest | undefined,
+  { rejectValue: string }
+>('auth/verifyToken', async (payload, { rejectWithValue }) => {
+  try {
+    const response = await axiosInstance.get<{ success: boolean } & VerifyTokenResponse>(
+      '/auth/verify-token'
+    );
+
+    const data = response.data;
+
+    return {
+      success: data.success,
+      user: data.user,
+      valid: data.valid,
+    };
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof Error ? error.message : 'Token verification failed'
     );
   }
 });

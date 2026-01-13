@@ -1,6 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { loginThunk } from '@/store/auth/authThunks';
 import { useTheme } from './useTheme';
 import { validateForm } from './validation';
 import type { SignInFormData, SignInFormErrors } from '@/types/signin.types';
@@ -14,12 +18,22 @@ import SignUpLink from './SignUpLink';
 
 export default function SignInForm() {
   const { isDark } = useTheme();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { login, user, isAuthenticated } = useAppSelector((state) => state.auth);
+  
   const [formData, setFormData] = useState<SignInFormData>({
     email: '',
     password: ''
   });
   const [errors, setErrors] = useState<SignInFormErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      router.push('/');
+    }
+  }, [isAuthenticated, user, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -33,18 +47,30 @@ export default function SignInForm() {
     }
   };
 
+  // Handle login errors
+  useEffect(() => {
+    if (login.error) {
+      toast.error(login.error);
+    }
+  }, [login.error]);
+
+  // Handle successful login
+  useEffect(() => {
+    if (login.loading === false && !login.error && user && isAuthenticated) {
+      toast.success('Sign in successful!');
+      router.push('/'); // Redirect to home page or dashboard
+    }
+  }, [login.loading, login.error, user, isAuthenticated, router]);
+
   const handleSubmit = async () => {
     const newErrors = validateForm(formData);
     setErrors(newErrors);
     
     if (Object.keys(newErrors).length === 0) {
-      setIsSubmitting(true);
-      
-      setTimeout(() => {
-        console.log('Sign in successful:', formData);
-        setIsSubmitting(false);
-        alert('Sign in successful! (Demo only)');
-      }, 1500);
+      dispatch(loginThunk({
+        email: formData.email,
+        password: formData.password
+      }));
     }
   };
 
@@ -75,7 +101,7 @@ export default function SignInForm() {
 
         <SignInButton
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={login.loading}
           isDark={isDark}
         />
       </div>

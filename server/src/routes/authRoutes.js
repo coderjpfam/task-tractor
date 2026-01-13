@@ -9,7 +9,8 @@ import {
   forgotPassword,
   resetPassword,
   verifyRegisterToken,
-  registerInvitedUser
+  registerInvitedUser,
+  verifyToken
 } from '../controllers/authController.js';
 
 const router = express.Router();
@@ -21,6 +22,7 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.get('/verify-register-token', verifyRegisterToken);
 router.post('/register-invited', upload.single('profilePic'), registerInvitedUser);
+router.get('/verify-token', verifyToken);
 
 // Protected authentication routes (require auth)
 router.post('/logout', logout);

@@ -1,6 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { resetPasswordThunk } from '@/store/auth/authThunks';
 import { useTheme } from '@/components/signin/useTheme';
 import PasswordInput from '@/components/signin/PasswordInput';
 import ResetPasswordHeader from './ResetPasswordHeader';
@@ -11,13 +15,22 @@ import type { ResetPasswordFormData, ResetPasswordFormErrors } from '@/types/res
 
 export default function ResetPasswordForm() {
   const { isDark } = useTheme();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const dispatch = useAppDispatch();
+  const { resetPassword } = useAppSelector((state) => state.auth);
+  
   const [formData, setFormData] = useState<ResetPasswordFormData>({
     password: '',
     confirmPassword: ''
   });
   const [errors, setErrors] = useState<ResetPasswordFormErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const prevLoadingRef = useRef<boolean>(false);
+  
+  // Get token and email from URL query params
+  const token = searchParams.get('token');
+  const email = searchParams.get('email');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -50,15 +63,44 @@ export default function ResetPasswordForm() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Validate token and email on mount
+  useEffect(() => {
+    if (!token || !email) {
+      toast.error('Invalid reset link. Please request a new password reset.');
+      router.push('/forgot-password');
+    }
+  }, [token, email, router]);
+
+  // Handle reset password errors
+  useEffect(() => {
+    if (resetPassword.error) {
+      toast.error(resetPassword.error);
+    }
+  }, [resetPassword.error]);
+
+  // Handle successful password reset
+  useEffect(() => {
+    // Track when loading transitions from true to false (request completed)
+    if (prevLoadingRef.current && !resetPassword.loading && !resetPassword.error) {
+      toast.success('Password reset successfully!');
+      setIsSuccess(true);
+    }
+    prevLoadingRef.current = resetPassword.loading;
+  }, [resetPassword.loading, resetPassword.error]);
+
   const handleSubmit = async () => {
+    if (!token || !email) {
+      toast.error('Invalid reset link. Please request a new password reset.');
+      return;
+    }
+
     if (validateForm()) {
-      setIsSubmitting(true);
-      
-      setTimeout(() => {
-        console.log('Password reset successful');
-        setIsSubmitting(false);
-        setIsSuccess(true);
-      }, 1500);
+      dispatch(resetPasswordThunk({
+        token,
+        email,
+        password: formData.password,
+        password_confirmation: formData.confirmPassword
+      }));
     }
   };
 
@@ -118,7 +160,7 @@ export default function ResetPasswordForm() {
 
         <ResetPasswordButton
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={resetPassword.loading || !token || !email}
           isDark={isDark}
         />
       </div>

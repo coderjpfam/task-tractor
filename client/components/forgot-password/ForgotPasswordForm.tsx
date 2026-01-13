@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-toastify';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { forgotPasswordThunk } from '@/store/auth/authThunks';
 import { useTheme } from '@/components/signin/useTheme';
 import { validateEmail } from '@/components/signin/validation';
 import EmailInput from '@/components/signin/EmailInput';
@@ -11,12 +14,15 @@ import type { ForgotPasswordFormData, ForgotPasswordFormErrors } from '@/types/f
 
 export default function ForgotPasswordForm() {
   const { isDark } = useTheme();
+  const dispatch = useAppDispatch();
+  const { forgotPassword } = useAppSelector((state) => state.auth);
+  
   const [formData, setFormData] = useState<ForgotPasswordFormData>({
     email: ''
   });
   const [errors, setErrors] = useState<ForgotPasswordFormErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const prevLoadingRef = useRef<boolean>(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -43,15 +49,28 @@ export default function ForgotPasswordForm() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Handle forgot password errors
+  useEffect(() => {
+    if (forgotPassword.error) {
+      toast.error(forgotPassword.error);
+    }
+  }, [forgotPassword.error]);
+
+  // Handle successful forgot password request
+  useEffect(() => {
+    // Track when loading transitions from true to false (request completed)
+    if (prevLoadingRef.current && !forgotPassword.loading && !forgotPassword.error) {
+      toast.success('If the email exists, a password reset link has been sent');
+      setIsSuccess(true);
+    }
+    prevLoadingRef.current = forgotPassword.loading;
+  }, [forgotPassword.loading, forgotPassword.error]);
+
   const handleSubmit = async () => {
     if (validateForm()) {
-      setIsSubmitting(true);
-      
-      setTimeout(() => {
-        console.log('Password reset link sent to:', formData.email);
-        setIsSubmitting(false);
-        setIsSuccess(true);
-      }, 1500);
+      dispatch(forgotPasswordThunk({
+        email: formData.email
+      }));
     }
   };
 
@@ -104,7 +123,7 @@ export default function ForgotPasswordForm() {
 
         <ResetButton
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={forgotPassword.loading}
           isDark={isDark}
         />
       </div>

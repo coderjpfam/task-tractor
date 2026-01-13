@@ -49,6 +49,21 @@ export const login = async (req, res, next) => {
       });
     }
 
+    // Fetch department information
+    let department = null;
+    if (user.departmentId) {
+      const departmentDoc = await Department.findOne({
+        departmentId: user.departmentId,
+        isDeleted: false
+      }).select('departmentId name');
+      if (departmentDoc) {
+        department = {
+          id: departmentDoc.departmentId,
+          name: departmentDoc.name
+        };
+      }
+    }
+
     // Generate tokens
     const accessToken = generateAccessToken(user.userId, user.email, user.role);
     const refreshToken = generateRefreshToken(user.userId);
@@ -70,7 +85,7 @@ export const login = async (req, res, next) => {
       fullName: user.fullName,
       email: user.email,
       profilePath: user.profilePath,
-      departmentId: user.departmentId,
+      department: department,
       role: user.role,
       createdAt: user.createdAt,
       joinedAt: user.joinedAt,
@@ -207,6 +222,21 @@ export const refreshToken = async (req, res, next) => {
       });
     }
 
+    // Fetch department information
+    let department = null;
+    if (user.departmentId) {
+      const departmentDoc = await Department.findOne({
+        departmentId: user.departmentId,
+        isDeleted: false
+      }).select('departmentId name');
+      if (departmentDoc) {
+        department = {
+          id: departmentDoc.departmentId,
+          name: departmentDoc.name
+        };
+      }
+    }
+
     // Generate new access token
     const accessToken = generateAccessToken(user.userId, user.email, user.role);
 
@@ -216,7 +246,7 @@ export const refreshToken = async (req, res, next) => {
       fullName: user.fullName,
       email: user.email,
       profilePath: user.profilePath,
-      departmentId: user.departmentId,
+      department: department,
       role: user.role,
       createdAt: user.createdAt,
       joinedAt: user.joinedAt,
@@ -427,13 +457,18 @@ export const verifyRegisterToken = async (req, res, next) => {
     }
 
     // Fetch department information
-    let departmentName = null;
+    let department = null;
     if (user.departmentId) {
-      const department = await Department.findOne({
+      const departmentDoc = await Department.findOne({
         departmentId: user.departmentId,
         isDeleted: false
-      }).select('name');
-      departmentName = department?.name || null;
+      }).select('departmentId name');
+      if (departmentDoc) {
+        department = {
+          id: departmentDoc.departmentId,
+          name: departmentDoc.name
+        };
+      }
     }
 
     // Return user information
@@ -443,8 +478,7 @@ export const verifyRegisterToken = async (req, res, next) => {
         userId: user.userId,
         fullName: user.fullName,
         email: user.email,
-        departmentId: user.departmentId,
-        departmentName: departmentName
+        department: department
       }
     });
   } catch (error) {
@@ -625,13 +659,28 @@ export const registerInvitedUser = async (req, res, next) => {
     
     await user.save();
 
+    // Fetch department information
+    let department = null;
+    if (user.departmentId) {
+      const departmentDoc = await Department.findOne({
+        departmentId: user.departmentId,
+        isDeleted: false
+      }).select('departmentId name');
+      if (departmentDoc) {
+        department = {
+          id: departmentDoc.departmentId,
+          name: departmentDoc.name
+        };
+      }
+    }
+
     // Prepare user data (exclude password)
     const userData = {
       userId: user.userId,
       fullName: user.fullName,
       email: user.email,
       profilePath: user.profilePath,
-      departmentId: user.departmentId,
+      department: department,
       role: user.role,
       createdAt: user.createdAt,
       joinedAt: user.joinedAt,
@@ -657,3 +706,82 @@ export const registerInvitedUser = async (req, res, next) => {
   }
 };
 
+// @desc    Verify Access Token
+// @route   GET /auth/verify-token
+// @access  Public (with token)
+// Header: Authorization: Bearer <access_token>
+export const verifyToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authorization token required'
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    // Verify access token
+    const { verifyAccessToken } = await import('../utils/jwt.js');
+    const decoded = verifyAccessToken(token);
+    
+    // Find user
+    const user = await User.findOne({
+      userId: decoded.userId,
+      isDeleted: false
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Fetch department information
+    let department = null;
+    if (user.departmentId) {
+      const departmentDoc = await Department.findOne({
+        departmentId: user.departmentId,
+        isDeleted: false
+      }).select('departmentId name');
+      if (departmentDoc) {
+        department = {
+          id: departmentDoc.departmentId,
+          name: departmentDoc.name
+        };
+      }
+    }
+
+    // Prepare user data (exclude password)
+    const userData = {
+      userId: user.userId,
+      fullName: user.fullName,
+      email: user.email,
+      profilePath: user.profilePath,
+      department: department,
+      role: user.role,
+      createdAt: user.createdAt,
+      joinedAt: user.joinedAt,
+      invitedOn: user.invitedOn,
+      status: user.status
+    };
+
+    res.status(200).json({
+      success: true,
+      user: userData,
+      valid: true
+    });
+  } catch (error) {
+    if (error.message.includes('Invalid or expired')) {
+      return res.status(401).json({
+        success: false,
+        error: error.message,
+        valid: false
+      });
+    }
+    next(error);
+  }
+};

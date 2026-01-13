@@ -13,6 +13,7 @@ import {
   changePasswordThunk,
   verifyRegisterTokenThunk,
   registerInvitedUserThunk,
+  verifyTokenThunk,
 } from './authThunks';
 
 // Initial state
@@ -54,6 +55,10 @@ const initialState: AuthState = {
     loading: false,
     error: null,
   },
+  verifyToken: {
+    loading: false,
+    error: null,
+  },
   
   isAuthenticated: false,
 };
@@ -81,6 +86,7 @@ const authSlice = createSlice({
       state.changePassword.error = null;
       state.verifyRegisterToken.error = null;
       state.registerInvitedUser.error = null;
+      state.verifyToken.error = null;
     },
     
     /**
@@ -107,7 +113,7 @@ const authSlice = createSlice({
       const key = action.payload;
       if (key === 'login' || key === 'logout' || key === 'refresh' || 
           key === 'forgotPassword' || key === 'resetPassword' || key === 'changePassword' ||
-          key === 'verifyRegisterToken' || key === 'registerInvitedUser') {
+          key === 'verifyRegisterToken' || key === 'registerInvitedUser' || key === 'verifyToken') {
         state[key].error = null;
       }
     },
@@ -250,10 +256,42 @@ const authSlice = createSlice({
         state.registerInvitedUser.error = null;
         // Update user data if registration is successful
         state.user = action.payload.user;
+        state.isAuthenticated = true;
       })
       .addCase(registerInvitedUserThunk.rejected, (state, action) => {
         state.registerInvitedUser.loading = false;
         state.registerInvitedUser.error = action.payload || 'Registration failed';
+      });
+
+    // Verify token
+    builder
+      .addCase(verifyTokenThunk.pending, (state) => {
+        state.verifyToken.loading = true;
+        state.verifyToken.error = null;
+      })
+      .addCase(verifyTokenThunk.fulfilled, (state, action) => {
+        state.verifyToken.loading = false;
+        state.verifyToken.error = null;
+        // Update user data if token is valid
+        if (action.payload.valid) {
+          state.user = action.payload.user;
+          state.isAuthenticated = true;
+        } else {
+          // Token is invalid, clear auth state
+          state.user = null;
+          state.accessToken = null;
+          state.refreshToken = null;
+          state.isAuthenticated = false;
+        }
+      })
+      .addCase(verifyTokenThunk.rejected, (state, action) => {
+        state.verifyToken.loading = false;
+        state.verifyToken.error = action.payload || 'Token verification failed';
+        // Clear auth state on verification failure
+        state.user = null;
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
       });
   },
 });

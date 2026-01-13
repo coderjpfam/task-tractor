@@ -10,7 +10,10 @@ export interface User {
   fullName: string;
   email: string;
   profilePath?: string;
-  departmentId?: string;
+  department?: {
+    id: string;
+    name: string;
+  } | null;
   role: 'admin' | 'manager' | 'team_lead' | 'employee';
   createdAt?: string;
   joinedAt?: string | Date;
@@ -121,8 +124,10 @@ export interface VerifyRegisterTokenData {
   userId: string;
   fullName: string;
   email: string;
-  departmentId: string;
-  departmentName: string | null;
+  department: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 /**
@@ -131,6 +136,22 @@ export interface VerifyRegisterTokenData {
 export interface VerifyRegisterTokenResponse {
   success: boolean;
   data: VerifyRegisterTokenData;
+}
+
+/**
+ * Verify token request payload (no payload needed, token is in header)
+ */
+export interface VerifyTokenRequest {
+  // No payload needed - token is sent in Authorization header
+}
+
+/**
+ * Verify token response
+ */
+export interface VerifyTokenResponse {
+  success: boolean;
+  user: User;
+  valid: boolean;
 }
 
 /**
@@ -158,6 +179,7 @@ export interface AuthState {
   changePassword: AsyncState;
   registerInvitedUser: AsyncState;
   verifyRegisterToken: AsyncState;
+  verifyToken: AsyncState;
   
   // General auth state
   isAuthenticated: boolean;

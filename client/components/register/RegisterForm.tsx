@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { verifyRegisterTokenThunk } from '@/store/auth/authThunks';
+import { verifyRegisterTokenThunk, registerInvitedUserThunk } from '@/store/auth/authThunks';
 import { useTheme } from '@/components/signin/useTheme';
 import { validateEmail } from '@/components/signin/validation';
 import EmailInput from '@/components/signin/EmailInput';
@@ -22,8 +24,9 @@ interface RegisterFormProps {
 
 export default function RegisterForm({ token }: RegisterFormProps) {
   const { isDark } = useTheme();
+  const router = useRouter();
   const dispatch = useAppDispatch();
-  const { verifyRegisterToken } = useAppSelector((state) => state.auth);
+  const { verifyRegisterToken, registerInvitedUser, user, isAuthenticated } = useAppSelector((state) => state.auth);
   
   const [formData, setFormData] = useState<RegisterFormData>({
     profilePic: null,
@@ -34,9 +37,16 @@ export default function RegisterForm({ token }: RegisterFormProps) {
     confirmPassword: ''
   });
   const [errors, setErrors] = useState<RegisterFormErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [tokenValidated, setTokenValidated] = useState(false);
+  const prevLoadingRef = useRef<boolean>(false);
+
+  // Redirect if already authenticated (unless registering with token)
+  useEffect(() => {
+    if (isAuthenticated && user && !token) {
+      router.push('/');
+    }
+  }, [isAuthenticated, user, token, router]);
 
   // Validate token and prefill form when token is available
   useEffect(() => {
@@ -52,7 +62,7 @@ export default function RegisterForm({ token }: RegisterFormProps) {
               ...prev,
               name: result.data.fullName || '',
               email: result.data.email || '',
-              department: result.data.departmentName || result.data.departmentId || ''
+              department: result.data.department?.name || ''
             }));
             setTokenValidated(true);
           }
@@ -131,20 +141,37 @@ export default function RegisterForm({ token }: RegisterFormProps) {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Handle register errors
+  useEffect(() => {
+    if (registerInvitedUser.error) {
+      toast.error(registerInvitedUser.error);
+    }
+  }, [registerInvitedUser.error]);
+
+  // Handle successful registration
+  useEffect(() => {
+    // Track when loading transitions from true to false (request completed)
+    if (prevLoadingRef.current && !registerInvitedUser.loading && !registerInvitedUser.error) {
+      toast.success('Registration completed successfully!');
+      setIsSuccess(true);
+    }
+    prevLoadingRef.current = registerInvitedUser.loading;
+  }, [registerInvitedUser.loading, registerInvitedUser.error]);
+
   const handleSubmit = async () => {
+    if (!token) {
+      toast.error('Registration token is required');
+      return;
+    }
+
     if (validateForm()) {
-      setIsSubmitting(true);
-      
-      // Simulate API call
-      setTimeout(() => {
-        console.log('Registration successful:', {
-          token,
-          ...formData,
-          profilePic: formData.profilePic?.name
-        });
-        setIsSubmitting(false);
-        setIsSuccess(true);
-      }, 1500);
+      dispatch(registerInvitedUserThunk({
+        token,
+        fullName: formData.name.trim(),
+        password: formData.password,
+        password_confirmation: formData.confirmPassword,
+        profilePic: formData.profilePic || undefined
+      }));
     }
   };
 
@@ -289,7 +316,7 @@ export default function RegisterForm({ token }: RegisterFormProps) {
 
         <RegisterButton
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={registerInvitedUser.loading || !token}
           isDark={isDark}
         />
       </div>
