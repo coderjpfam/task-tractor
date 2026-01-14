@@ -44,7 +44,7 @@ export default function RegisterForm({ token }: RegisterFormProps) {
   // Redirect if already authenticated (unless registering with token)
   useEffect(() => {
     if (isAuthenticated && user && !token) {
-      router.push('/');
+      router.push('/dashboard');
     }
   }, [isAuthenticated, user, token, router]);
 
@@ -154,9 +154,13 @@ export default function RegisterForm({ token }: RegisterFormProps) {
     if (prevLoadingRef.current && !registerInvitedUser.loading && !registerInvitedUser.error) {
       toast.success('Registration completed successfully!');
       setIsSuccess(true);
+      // Redirect to dashboard after a short delay
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 1500);
     }
     prevLoadingRef.current = registerInvitedUser.loading;
-  }, [registerInvitedUser.loading, registerInvitedUser.error]);
+  }, [registerInvitedUser.loading, registerInvitedUser.error, router]);
 
   const handleSubmit = async () => {
     if (!token) {

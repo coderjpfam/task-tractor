@@ -31,7 +31,7 @@ export default function SignInForm() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      router.push('/');
+      router.push('/dashboard');
     }
   }, [isAuthenticated, user, router]);
 
@@ -58,7 +58,7 @@ export default function SignInForm() {
   useEffect(() => {
     if (login.loading === false && !login.error && user && isAuthenticated) {
       toast.success('Sign in successful!');
-      router.push('/'); // Redirect to home page or dashboard
+      router.push('/dashboard');
     }
   }, [login.loading, login.error, user, isAuthenticated, router]);
 
